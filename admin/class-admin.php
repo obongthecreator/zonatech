@@ -27,6 +27,12 @@ class ZonaTech_Admin {
         // AJAX handlers for admin actions
         add_action('wp_ajax_zonatech_save_pricing', array($this, 'handle_save_pricing'));
         add_action('wp_ajax_zonatech_get_pricing', array($this, 'handle_get_pricing'));
+        
+        // AJAX handlers for user access management
+        add_action('wp_ajax_zonatech_search_users', array($this, 'handle_search_users'));
+        add_action('wp_ajax_zonatech_grant_access', array($this, 'handle_grant_access'));
+        add_action('wp_ajax_zonatech_revoke_access', array($this, 'handle_revoke_access'));
+        add_action('wp_ajax_zonatech_get_user_access', array($this, 'handle_get_user_access'));
     }
     
     public function show_setup_notice() {
@@ -100,6 +106,15 @@ class ZonaTech_Admin {
             'manage_options',
             'zonatech-users',
             array($this, 'render_users')
+        );
+        
+        add_submenu_page(
+            'zonatech-ng',
+            'User Access',
+            'User Access',
+            'manage_options',
+            'zonatech-user-access',
+            array($this, 'render_user_access')
         );
         
         add_submenu_page(
@@ -295,5 +310,253 @@ class ZonaTech_Admin {
     
     public function render_settings() {
         include ZONATECH_PLUGIN_DIR . 'admin/views/settings.php';
+    }
+    
+    public function render_user_access() {
+        include ZONATECH_PLUGIN_DIR . 'admin/views/user-access.php';
+    }
+    
+    /**
+     * AJAX: Search users by email or username
+     */
+    public function handle_search_users() {
+        check_ajax_referer('zonatech_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Unauthorized.'));
+            return;
+        }
+        
+        $search = sanitize_text_field($_POST['search'] ?? '');
+        
+        if (strlen($search) < 2) {
+            wp_send_json_error(array('message' => 'Please enter at least 2 characters.'));
+            return;
+        }
+        
+        $users = get_users(array(
+            'search' => '*' . $search . '*',
+            'search_columns' => array('user_login', 'user_email', 'display_name'),
+            'number' => 20,
+            'orderby' => 'display_name',
+            'order' => 'ASC'
+        ));
+        
+        $results = array();
+        foreach ($users as $user) {
+            $results[] = array(
+                'id' => $user->ID,
+                'display_name' => $user->display_name,
+                'email' => $user->user_email,
+                'username' => $user->user_login
+            );
+        }
+        
+        wp_send_json_success(array('users' => $results));
+    }
+    
+    /**
+     * AJAX: Grant access to a user (admin manually approves)
+     */
+    public function handle_grant_access() {
+        check_ajax_referer('zonatech_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Unauthorized.'));
+            return;
+        }
+        
+        $user_id = intval($_POST['user_id'] ?? 0);
+        $exam_type = strtolower(sanitize_text_field($_POST['exam_type'] ?? ''));
+        $category = sanitize_text_field($_POST['category'] ?? '');
+        $duration = sanitize_text_field($_POST['duration'] ?? 'monthly');
+        
+        if (!$user_id || !$exam_type || !$category) {
+            wp_send_json_error(array('message' => 'Please fill in all required fields.'));
+            return;
+        }
+        
+        $user = get_userdata($user_id);
+        if (!$user) {
+            wp_send_json_error(array('message' => 'User not found.'));
+            return;
+        }
+        
+        $valid_exam_types = array('jamb', 'waec', 'neco');
+        if (!in_array($exam_type, $valid_exam_types)) {
+            wp_send_json_error(array('message' => 'Invalid exam type.'));
+            return;
+        }
+        
+        $valid_categories = array('science', 'arts', 'business');
+        if (!in_array($category, $valid_categories)) {
+            wp_send_json_error(array('message' => 'Invalid category.'));
+            return;
+        }
+        
+        // Calculate expiration
+        switch ($duration) {
+            case 'sixmonth':
+                $expires_at = date('Y-m-d H:i:s', strtotime('+6 months'));
+                break;
+            case 'lifetime':
+                $expires_at = null;
+                break;
+            case 'monthly':
+            default:
+                $expires_at = date('Y-m-d H:i:s', strtotime('+1 month'));
+                break;
+        }
+        
+        global $wpdb;
+        $table_access = $wpdb->prefix . 'zonatech_user_access';
+        
+        // Check if user already has active access for this exam_type + category
+        $existing = $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM $table_access 
+             WHERE user_id = %d AND exam_type = %s AND category = %s 
+             AND (expires_at IS NULL OR expires_at > NOW())",
+            $user_id,
+            $exam_type,
+            $category
+        ));
+        
+        if ($existing) {
+            wp_send_json_error(array('message' => 'User already has active access for this exam type and category.'));
+            return;
+        }
+        
+        $insert_data = array(
+            'user_id' => $user_id,
+            'exam_type' => $exam_type,
+            'category' => $category,
+            'subject' => null,
+            'purchase_id' => null,
+            'expires_at' => $expires_at
+        );
+        
+        $result = $wpdb->insert($table_access, $insert_data);
+        
+        if ($result === false) {
+            wp_send_json_error(array('message' => 'Failed to grant access. Please try again.'));
+            return;
+        }
+        
+        // Log the activity
+        if (class_exists('ZonaTech_Activity_Log')) {
+            $duration_label = $duration === 'lifetime' ? 'lifetime' : ($duration === 'sixmonth' ? '6 months' : '1 month');
+            ZonaTech_Activity_Log::log(
+                $user_id,
+                'admin_grant_access',
+                sprintf('Admin granted %s %s %s access (%s)', strtoupper($exam_type), ucfirst($category), 'category', $duration_label),
+                array('exam_type' => $exam_type, 'category' => $category, 'duration' => $duration, 'granted_by' => get_current_user_id())
+            );
+        }
+        
+        wp_send_json_success(array(
+            'message' => sprintf('Access granted to %s for %s %s.', esc_html($user->display_name), strtoupper($exam_type), ucfirst($category))
+        ));
+    }
+    
+    /**
+     * AJAX: Revoke access for a user
+     */
+    public function handle_revoke_access() {
+        check_ajax_referer('zonatech_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Unauthorized.'));
+            return;
+        }
+        
+        $access_id = intval($_POST['access_id'] ?? 0);
+        
+        if (!$access_id) {
+            wp_send_json_error(array('message' => 'Invalid access record.'));
+            return;
+        }
+        
+        global $wpdb;
+        $table_access = $wpdb->prefix . 'zonatech_user_access';
+        
+        // Get the record first for logging
+        $record = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_access WHERE id = %d", $access_id));
+        
+        if (!$record) {
+            wp_send_json_error(array('message' => 'Access record not found.'));
+            return;
+        }
+        
+        $result = $wpdb->delete($table_access, array('id' => $access_id), array('%d'));
+        
+        if ($result === false) {
+            wp_send_json_error(array('message' => 'Failed to revoke access. Please try again.'));
+            return;
+        }
+        
+        // Log the activity
+        if (class_exists('ZonaTech_Activity_Log')) {
+            ZonaTech_Activity_Log::log(
+                $record->user_id,
+                'admin_revoke_access',
+                sprintf('Admin revoked %s %s access', strtoupper($record->exam_type), ucfirst($record->category ?: $record->subject ?: '')),
+                array('access_id' => $access_id, 'revoked_by' => get_current_user_id())
+            );
+        }
+        
+        wp_send_json_success(array('message' => 'Access revoked successfully.'));
+    }
+    
+    /**
+     * AJAX: Get access records for a specific user
+     */
+    public function handle_get_user_access() {
+        check_ajax_referer('zonatech_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Unauthorized.'));
+            return;
+        }
+        
+        $user_id = intval($_POST['user_id'] ?? 0);
+        
+        if (!$user_id) {
+            wp_send_json_error(array('message' => 'Invalid user.'));
+            return;
+        }
+        
+        global $wpdb;
+        $table_access = $wpdb->prefix . 'zonatech_user_access';
+        
+        $records = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $table_access WHERE user_id = %d ORDER BY created_at DESC",
+            $user_id
+        ));
+        
+        $formatted = array();
+        foreach ($records as $record) {
+            $is_active = empty($record->expires_at) || strtotime($record->expires_at) > time();
+            $formatted[] = array(
+                'id' => $record->id,
+                'exam_type' => strtoupper($record->exam_type),
+                'category' => ucfirst($record->category ?: ''),
+                'subject' => $record->subject ?: '',
+                'purchase_id' => $record->purchase_id,
+                'status' => $is_active ? 'active' : 'expired',
+                'expires_at' => $record->expires_at ? date('M j, Y g:i A', strtotime($record->expires_at)) : 'Lifetime',
+                'created_at' => date('M j, Y g:i A', strtotime($record->created_at))
+            );
+        }
+        
+        $user = get_userdata($user_id);
+        
+        wp_send_json_success(array(
+            'records' => $formatted,
+            'user' => array(
+                'id' => $user->ID,
+                'display_name' => $user->display_name,
+                'email' => $user->user_email
+            )
+        ));
     }
 }
