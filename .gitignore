@@ -1,5 +1,6 @@
 # Uploaded files and archives
 *.zip
+!zonatech-ng-plugin.zip
 Screenshot*.png
 *.pdf
 
