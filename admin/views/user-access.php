@@ -153,8 +153,8 @@ $expired_count = count($expired_records);
                             <td><a href="mailto:<?php echo esc_attr($record->user_email); ?>"><?php echo esc_html($record->user_email); ?></a></td>
                             <td><span class="zonatech-badge" style="background: #8b5cf6; color: #fff; padding: 3px 8px; border-radius: 3px; font-size: 11px;"><?php echo esc_html(strtoupper($record->exam_type)); ?></span></td>
                             <td><?php echo esc_html(ucfirst($record->category ?: $record->subject ?: '—')); ?></td>
-                            <td><?php echo $record->purchase_id ? '<span style="color: #22c55e;">Payment #' . intval($record->purchase_id) . '</span>' : '<span style="color: #0073aa;">Admin</span>'; ?></td>
-                            <td><?php echo date('M j, Y', strtotime($record->created_at)); ?></td>
+                            <td><?php echo $record->purchase_id ? '<span style="color: #22c55e;">Payment #' . esc_html(intval($record->purchase_id)) . '</span>' : '<span style="color: #0073aa;">Admin</span>'; ?></td>
+                            <td><?php echo esc_html(date('M j, Y', strtotime($record->created_at))); ?></td>
                             <td>
                                 <?php if (empty($record->expires_at)): ?>
                                     <span style="color: #22c55e; font-weight: bold;">Lifetime</span>
@@ -204,9 +204,9 @@ $expired_count = count($expired_records);
                             <td><a href="mailto:<?php echo esc_attr($record->user_email); ?>"><?php echo esc_html($record->user_email); ?></a></td>
                             <td><span class="zonatech-badge" style="background: #999; color: #fff; padding: 3px 8px; border-radius: 3px; font-size: 11px;"><?php echo esc_html(strtoupper($record->exam_type)); ?></span></td>
                             <td><?php echo esc_html(ucfirst($record->category ?: $record->subject ?: '—')); ?></td>
-                            <td><?php echo $record->purchase_id ? '<span style="color: #999;">Payment #' . intval($record->purchase_id) . '</span>' : '<span style="color: #999;">Admin</span>'; ?></td>
-                            <td><?php echo date('M j, Y', strtotime($record->created_at)); ?></td>
-                            <td><span style="color: #d63638;"><?php echo date('M j, Y', strtotime($record->expires_at)); ?></span></td>
+                            <td><?php echo $record->purchase_id ? '<span style="color: #999;">Payment #' . esc_html(intval($record->purchase_id)) . '</span>' : '<span style="color: #999;">Admin</span>'; ?></td>
+                            <td><?php echo esc_html(date('M j, Y', strtotime($record->created_at))); ?></td>
+                            <td><span style="color: #d63638;"><?php echo esc_html(date('M j, Y', strtotime($record->expires_at))); ?></span></td>
                             <td>
                                 <button type="button" class="button button-small revoke-access-btn" data-id="<?php echo $record->id; ?>" data-user="<?php echo esc_attr($record->display_name); ?>" style="color: #999;">
                                     <span class="dashicons dashicons-trash" style="vertical-align: middle; font-size: 16px;"></span> Delete
@@ -247,7 +247,7 @@ jQuery(document).ready(function($) {
                     if (response.success && response.data.users.length > 0) {
                         var html = '';
                         response.data.users.forEach(function(user) {
-                            html += '<div class="user-search-item" data-id="' + user.id + '" data-name="' + escapeHtml(user.display_name) + '" data-email="' + escapeHtml(user.email) + '" style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">';
+                            html += '<div class="user-search-item" data-id="' + parseInt(user.id) + '" data-name="' + escapeHtml(user.display_name) + '" data-email="' + escapeHtml(user.email) + '" style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">';
                             html += '<div><strong>' + escapeHtml(user.display_name) + '</strong> <small style="color: #666;">@' + escapeHtml(user.username) + '</small></div>';
                             html += '<div style="color: #666; font-size: 12px;">' + escapeHtml(user.email) + '</div>';
                             html += '</div>';
@@ -350,8 +350,12 @@ jQuery(document).ready(function($) {
     
     // Revoke access button
     $(document).on('click', '.revoke-access-btn', function() {
-        var accessId = $(this).data('id');
+        var accessId = parseInt($(this).data('id'));
         var userName = $(this).data('user');
+        
+        if (!accessId || isNaN(accessId)) {
+            return;
+        }
         
         if (!confirm('Are you sure you want to revoke access for "' + userName + '"? This cannot be undone.')) {
             return;
