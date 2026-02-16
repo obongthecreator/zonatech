@@ -444,7 +444,7 @@ class ZonaTech_NG {
             'paystack_public_key' => ZONATECH_PAYSTACK_PUBLIC_KEY,
             'paystack_configured' => !empty(ZONATECH_PAYSTACK_PUBLIC_KEY),
             'subject_price' => ZONATECH_SUBJECT_PRICE,
-            'category_price' => defined('ZONATECH_CATEGORY_PRICE') ? ZONATECH_CATEGORY_PRICE : 5000,
+            'category_price' => ZONATECH_CATEGORY_PRICE,
             'monthly_price' => defined('ZONATECH_MONTHLY_PRICE') ? ZONATECH_MONTHLY_PRICE : 5000,
             'sixmonth_price' => defined('ZONATECH_6MONTH_PRICE') ? ZONATECH_6MONTH_PRICE : 25000,
             'free_questions_limit' => defined('ZONATECH_FREE_QUESTIONS_LIMIT') ? ZONATECH_FREE_QUESTIONS_LIMIT : 10,
