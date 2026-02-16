@@ -414,6 +414,28 @@ class ZonaTech_Admin {
         global $wpdb;
         $table_access = $wpdb->prefix . 'zonatech_user_access';
         
+        // Ensure the table exists (create it if missing)
+        $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_access));
+        if ($table_exists !== $table_access) {
+            require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+            $charset_collate = $wpdb->get_charset_collate();
+            $sql = "CREATE TABLE $table_access (
+                id bigint(20) NOT NULL AUTO_INCREMENT,
+                user_id bigint(20) NOT NULL,
+                exam_type varchar(20) NOT NULL,
+                subject varchar(100) DEFAULT NULL,
+                category varchar(50) DEFAULT NULL,
+                purchase_id bigint(20) DEFAULT NULL,
+                expires_at datetime DEFAULT NULL,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY user_id (user_id),
+                KEY exam_subject (exam_type, subject),
+                KEY exam_category (exam_type, category)
+            ) $charset_collate;";
+            dbDelta($sql);
+        }
+        
         $granted = array();
         $skipped = array();
         
@@ -433,19 +455,30 @@ class ZonaTech_Admin {
                 continue;
             }
             
-            $insert_data = array(
-                'user_id' => $user_id,
-                'exam_type' => $exam_type,
-                'category' => $cat,
-                'subject' => null,
-                'purchase_id' => null,
-                'expires_at' => $expires_at
-            );
+            // Use raw SQL to properly handle NULL values (wpdb->insert can fail with NULLs)
+            if ($expires_at === null) {
+                $result = $wpdb->query($wpdb->prepare(
+                    "INSERT INTO $table_access (user_id, exam_type, category, subject, purchase_id, expires_at, created_at) 
+                     VALUES (%d, %s, %s, NULL, NULL, NULL, NOW())",
+                    $user_id,
+                    $exam_type,
+                    $cat
+                ));
+            } else {
+                $result = $wpdb->query($wpdb->prepare(
+                    "INSERT INTO $table_access (user_id, exam_type, category, subject, purchase_id, expires_at, created_at) 
+                     VALUES (%d, %s, %s, NULL, NULL, %s, NOW())",
+                    $user_id,
+                    $exam_type,
+                    $cat,
+                    $expires_at
+                ));
+            }
             
-            $result = $wpdb->insert($table_access, $insert_data);
-            
-            if ($result !== false) {
+            if ($result !== false && $result > 0) {
                 $granted[] = ucfirst($cat);
+            } else {
+                error_log('ZonaTech: Failed to insert access record. DB Error: ' . $wpdb->last_error);
             }
         }
         
@@ -455,7 +488,7 @@ class ZonaTech_Admin {
         }
         
         if (empty($granted)) {
-            wp_send_json_error(array('message' => 'Failed to grant access. Please try again.'));
+            wp_send_json_error(array('message' => 'Failed to grant access. DB Error: ' . $wpdb->last_error));
             return;
         }
         
