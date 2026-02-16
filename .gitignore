@@ -1,0 +1,24 @@
+# Uploaded files and archives
+*.zip
+!zonatech-ng-plugin.zip
+Screenshot*.png
+*.pdf
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# WordPress uploads (if applicable)
+uploads/
+
+# Node modules (if applicable)
+node_modules/
+
+# Compiled files
+*.log
