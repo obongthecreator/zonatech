@@ -388,7 +388,7 @@ class ZonaTech_Admin {
             return;
         }
         
-        $valid_categories = array('science', 'arts', 'business');
+        $valid_categories = array('science', 'arts', 'business', 'all');
         if (!in_array($category, $valid_categories)) {
             wp_send_json_error(array('message' => 'Invalid category.'));
             return;
@@ -408,36 +408,53 @@ class ZonaTech_Admin {
                 break;
         }
         
+        // Determine which categories to grant
+        $categories_to_grant = ($category === 'all') ? array('science', 'arts', 'business') : array($category);
+        
         global $wpdb;
         $table_access = $wpdb->prefix . 'zonatech_user_access';
         
-        // Check if user already has active access for this exam_type + category
-        $existing = $wpdb->get_var($wpdb->prepare(
-            "SELECT id FROM $table_access 
-             WHERE user_id = %d AND exam_type = %s AND category = %s 
-             AND (expires_at IS NULL OR expires_at > NOW())",
-            $user_id,
-            $exam_type,
-            $category
-        ));
+        $granted = array();
+        $skipped = array();
         
-        if ($existing) {
-            wp_send_json_error(array('message' => 'User already has active access for this exam type and category.'));
+        foreach ($categories_to_grant as $cat) {
+            // Check if user already has active access for this exam_type + category
+            $existing = $wpdb->get_var($wpdb->prepare(
+                "SELECT id FROM $table_access 
+                 WHERE user_id = %d AND exam_type = %s AND category = %s 
+                 AND (expires_at IS NULL OR expires_at > NOW())",
+                $user_id,
+                $exam_type,
+                $cat
+            ));
+            
+            if ($existing) {
+                $skipped[] = ucfirst($cat);
+                continue;
+            }
+            
+            $insert_data = array(
+                'user_id' => $user_id,
+                'exam_type' => $exam_type,
+                'category' => $cat,
+                'subject' => null,
+                'purchase_id' => null,
+                'expires_at' => $expires_at
+            );
+            
+            $result = $wpdb->insert($table_access, $insert_data);
+            
+            if ($result !== false) {
+                $granted[] = ucfirst($cat);
+            }
+        }
+        
+        if (empty($granted) && !empty($skipped)) {
+            wp_send_json_error(array('message' => 'User already has active access for: ' . implode(', ', $skipped) . '.'));
             return;
         }
         
-        $insert_data = array(
-            'user_id' => $user_id,
-            'exam_type' => $exam_type,
-            'category' => $category,
-            'subject' => null,
-            'purchase_id' => null,
-            'expires_at' => $expires_at
-        );
-        
-        $result = $wpdb->insert($table_access, $insert_data);
-        
-        if ($result === false) {
+        if (empty($granted)) {
             wp_send_json_error(array('message' => 'Failed to grant access. Please try again.'));
             return;
         }
@@ -445,17 +462,21 @@ class ZonaTech_Admin {
         // Log the activity
         if (class_exists('ZonaTech_Activity_Log')) {
             $duration_label = $duration === 'lifetime' ? 'lifetime' : ($duration === 'sixmonth' ? '6 months' : '1 month');
+            $cat_label = ($category === 'all') ? 'All Categories' : ucfirst($category);
             ZonaTech_Activity_Log::log(
                 $user_id,
                 'admin_grant_access',
-                sprintf('Admin granted %s %s %s access (%s)', strtoupper($exam_type), ucfirst($category), 'category', $duration_label),
+                sprintf('Admin granted %s %s access (%s)', strtoupper($exam_type), $cat_label, $duration_label),
                 array('exam_type' => $exam_type, 'category' => $category, 'duration' => $duration, 'granted_by' => get_current_user_id())
             );
         }
         
-        wp_send_json_success(array(
-            'message' => sprintf('Access granted to %s for %s %s.', esc_html($user->display_name), strtoupper($exam_type), ucfirst($category))
-        ));
+        $message = sprintf('Access granted to %s for %s %s.', esc_html($user->display_name), strtoupper($exam_type), implode(', ', $granted));
+        if (!empty($skipped)) {
+            $message .= ' (Already had access to: ' . implode(', ', $skipped) . ')';
+        }
+        
+        wp_send_json_success(array('message' => $message));
     }
     
     /**

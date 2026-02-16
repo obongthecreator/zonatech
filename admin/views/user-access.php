@@ -84,6 +84,7 @@ $expired_count = count($expired_records);
                     <td>
                         <select id="grant-category" class="regular-text">
                             <option value="">Select Category</option>
+                            <option value="all">All Categories (Science + Arts + Business)</option>
                             <option value="science">Science</option>
                             <option value="arts">Arts</option>
                             <option value="business">Business/Commercial</option>
