@@ -338,6 +338,7 @@ class ZonaTech_Paystack {
         switch ($purchase->purchase_type) {
             case 'subscription':
                 // Handle subscription with expiration date based on plan
+                // Subscriptions grant access to ALL 3 categories (science, arts, business)
                 $table_access = $wpdb->prefix . 'zonatech_user_access';
                 $plan = $meta_data['plan'] ?? 'monthly';
                 
@@ -348,14 +349,30 @@ class ZonaTech_Paystack {
                     $expires_at = date('Y-m-d H:i:s', strtotime('+1 month'));
                 }
                 
-                $wpdb->insert($table_access, array(
-                    'user_id' => $purchase->user_id,
-                    'exam_type' => $meta_data['exam_type'] ?? '',
-                    'category' => $meta_data['category'] ?? '',
-                    'subject' => '',
-                    'purchase_id' => $purchase->id,
-                    'expires_at' => $expires_at
-                ));
+                // Grant access to all 3 categories
+                $all_categories = array('science', 'arts', 'business');
+                foreach ($all_categories as $cat) {
+                    // Check if user already has active access for this category
+                    $existing = $wpdb->get_var($wpdb->prepare(
+                        "SELECT id FROM $table_access 
+                         WHERE user_id = %d AND exam_type = %s AND category = %s 
+                         AND (expires_at IS NULL OR expires_at > NOW())",
+                        $purchase->user_id,
+                        $meta_data['exam_type'] ?? '',
+                        $cat
+                    ));
+                    
+                    if (!$existing) {
+                        $wpdb->insert($table_access, array(
+                            'user_id' => $purchase->user_id,
+                            'exam_type' => $meta_data['exam_type'] ?? '',
+                            'category' => $cat,
+                            'subject' => '',
+                            'purchase_id' => $purchase->id,
+                            'expires_at' => $expires_at
+                        ));
+                    }
+                }
                 break;
             
             case 'category':
