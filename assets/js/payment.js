@@ -159,6 +159,9 @@
                                 } else {
                                     window.location.href = zonatech_ajax.site_url + '/zonatech-scratch-cards/';
                                 }
+                            } else if (response.data.purchase && (response.data.purchase.type === 'subscription' || response.data.purchase.type === 'category')) {
+                                // Redirect to past questions page for subscription/category purchases
+                                window.location.href = zonatech_ajax.site_url + '/zonatech-past-questions/';
                             } else if (response.data.purchase && response.data.purchase.type === 'subject') {
                                 // Redirect to dashboard's My Subjects section
                                 window.location.href = zonatech_ajax.site_url + '/zonatech-dashboard/#my-subjects';

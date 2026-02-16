@@ -259,6 +259,9 @@ class ZonaTech_Paystack {
         if ($purchase->purchase_type === 'subject') {
             $action_url = site_url('/zonatech-dashboard/#my-subjects');
             $action_text = 'View My Subjects';
+        } elseif ($purchase->purchase_type === 'subscription' || $purchase->purchase_type === 'category') {
+            $action_url = site_url('/zonatech-past-questions/');
+            $action_text = 'Access Past Questions';
         } elseif ($purchase->purchase_type === 'scratch_card') {
             $action_url = site_url('/zonatech-scratch-cards/');
             $action_text = 'View My Cards';
@@ -326,6 +329,11 @@ class ZonaTech_Paystack {
     private function process_purchase($purchase) {
         global $wpdb;
         $meta_data = json_decode($purchase->meta_data, true);
+        
+        // Normalize exam_type to lowercase to prevent case-mismatch issues
+        if (isset($meta_data['exam_type'])) {
+            $meta_data['exam_type'] = strtolower($meta_data['exam_type']);
+        }
         
         switch ($purchase->purchase_type) {
             case 'subscription':
@@ -864,6 +872,20 @@ class ZonaTech_Paystack {
     
     private function get_item_name($payment_type, $meta_data) {
         switch ($payment_type) {
+            case 'subscription':
+                $category_names = array(
+                    'science' => 'Science',
+                    'arts' => 'Arts',
+                    'business' => 'Business/Commercial'
+                );
+                $cat_name = $category_names[$meta_data['category'] ?? ''] ?? ucfirst($meta_data['category'] ?? '');
+                $plan = isset($meta_data['plan']) && $meta_data['plan'] === 'sixmonth' ? '6-Month' : 'Monthly';
+                return sprintf(
+                    '%s %s Subscription (%s)',
+                    strtoupper($meta_data['exam_type'] ?? ''),
+                    $cat_name,
+                    $plan
+                );
             case 'category':
                 $category_names = array(
                     'science' => 'Science',

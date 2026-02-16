@@ -202,6 +202,9 @@ class ZonaTech_Past_Questions {
             return true;
         }
         
+        // Normalize exam_type to lowercase for consistent matching
+        $exam_type = strtolower($exam_type);
+        
         global $wpdb;
         
         // Check if the table exists first
@@ -618,7 +621,7 @@ class ZonaTech_Past_Questions {
             wp_send_json_success(array(
                 'has_access' => $has_access,
                 'category' => $category,
-                'category_price' => ZONATECH_CATEGORY_PRICE
+                'category_price' => defined('ZONATECH_CATEGORY_PRICE') ? ZONATECH_CATEGORY_PRICE : 5000
             ));
         }
         
@@ -635,6 +638,9 @@ class ZonaTech_Past_Questions {
         if (user_can($user_id, 'manage_options')) {
             return true;
         }
+        
+        // Normalize exam_type to lowercase for consistent matching
+        $exam_type = strtolower($exam_type);
         
         global $wpdb;
         $table_access = $wpdb->prefix . 'zonatech_user_access';

@@ -638,7 +638,7 @@ jQuery(document).ready(function($) {
                 html += '<div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 12px; padding: 1.5rem; min-width: 200px;">';
                 html += '<p class="text-muted" style="margin: 0 0 0.5rem; font-size: 0.9rem;">Monthly Plan</p>';
                 html += '<p class="text-white" style="margin: 0; font-size: 1.5rem; font-weight: 700;">₦' + window.questionData.monthly_price.toLocaleString() + '<span style="font-size: 0.9rem; font-weight: 400; color: #a78bfa;">/month</span></p>';
-                html += '<button class="btn btn-primary" onclick="subscribeCategory(\'' + currentExamType + '\', \'' + window.questionData.category + '\', \'monthly\')" style="margin-top: 1rem; width: 100%;">Subscribe Monthly</button>';
+                html += '<button class="btn btn-primary" onclick="subscribeCategory(\'' + currentExamType.toLowerCase() + '\', \'' + window.questionData.category + '\', \'monthly\')" style="margin-top: 1rem; width: 100%;">Subscribe Monthly</button>';
                 html += '</div>';
                 
                 html += '<div style="background: rgba(139, 92, 246, 0.15); border: 2px solid rgba(139, 92, 246, 0.5); border-radius: 12px; padding: 1.5rem; min-width: 200px; position: relative;">';
@@ -646,7 +646,7 @@ jQuery(document).ready(function($) {
                 html += '<p class="text-muted" style="margin: 0 0 0.5rem; font-size: 0.9rem;">6-Month Plan</p>';
                 html += '<p class="text-white" style="margin: 0; font-size: 1.5rem; font-weight: 700;">₦' + window.questionData.sixmonth_price.toLocaleString() + '<span style="font-size: 0.9rem; font-weight: 400; color: #a78bfa;">/6 months</span></p>';
                 html += '<p class="text-success" style="margin: 0.25rem 0 0; font-size: 0.8rem;">Save ₦' + ((window.questionData.monthly_price * 6) - window.questionData.sixmonth_price).toLocaleString() + '!</p>';
-                html += '<button class="btn btn-primary" onclick="subscribeCategory(\'' + currentExamType + '\', \'' + window.questionData.category + '\', \'sixmonth\')" style="margin-top: 1rem; width: 100%;">Subscribe 6 Months</button>';
+                html += '<button class="btn btn-primary" onclick="subscribeCategory(\'' + currentExamType.toLowerCase() + '\', \'' + window.questionData.category + '\', \'sixmonth\')" style="margin-top: 1rem; width: 100%;">Subscribe 6 Months</button>';
                 html += '</div>';
                 html += '</div>';
                 
@@ -814,6 +814,8 @@ function startQuiz(examType, subject) {
 
 // Subscribe to category function (global scope) - supports monthly and 6-month plans
 function subscribeCategory(examType, category, plan) {
+    // Normalize exam type to lowercase for consistent storage
+    examType = examType.toLowerCase();
     console.log('subscribeCategory called:', examType, category, plan);
     
     var price = plan === 'sixmonth' ? 
@@ -852,6 +854,8 @@ function subscribeCategory(examType, category, plan) {
 
 // Purchase category function (global scope)
 function purchaseCategory(examType, category) {
+    // Normalize exam type to lowercase for consistent storage
+    examType = examType.toLowerCase();
     console.log('purchaseCategory called:', examType, category);
     
     if (typeof ZonaTechPayment !== 'undefined' && typeof ZonaTechPayment.initiatePayment === 'function') {
