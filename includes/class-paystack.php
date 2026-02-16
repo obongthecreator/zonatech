@@ -352,7 +352,7 @@ class ZonaTech_Paystack {
                     'user_id' => $purchase->user_id,
                     'exam_type' => $meta_data['exam_type'] ?? '',
                     'category' => $meta_data['category'] ?? '',
-                    'subject' => null,
+                    'subject' => '',
                     'purchase_id' => $purchase->id,
                     'expires_at' => $expires_at
                 ));
@@ -365,7 +365,7 @@ class ZonaTech_Paystack {
                     'user_id' => $purchase->user_id,
                     'exam_type' => $meta_data['exam_type'] ?? '',
                     'category' => $meta_data['category'] ?? '',
-                    'subject' => null,
+                    'subject' => '',
                     'purchase_id' => $purchase->id,
                     'expires_at' => date('Y-m-d H:i:s', strtotime('+1 month'))
                 ));
@@ -378,7 +378,7 @@ class ZonaTech_Paystack {
                     'user_id' => $purchase->user_id,
                     'exam_type' => $meta_data['exam_type'] ?? '',
                     'subject' => $meta_data['subject'] ?? '',
-                    'category' => null,
+                    'category' => '',
                     'purchase_id' => $purchase->id,
                     'expires_at' => date('Y-m-d H:i:s', strtotime('+1 month'))
                 ));

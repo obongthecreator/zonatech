@@ -440,18 +440,20 @@ class ZonaTech_Admin {
             if ($expires_at === null) {
                 $result = $wpdb->query($wpdb->prepare(
                     "INSERT INTO $table_access (user_id, exam_type, category, subject, purchase_id, expires_at, created_at) 
-                     VALUES (%d, %s, %s, NULL, NULL, NULL, NOW())",
+                     VALUES (%d, %s, %s, %s, 0, NULL, NOW())",
                     $user_id,
                     $exam_type,
-                    $cat
+                    $cat,
+                    ''
                 ));
             } else {
                 $result = $wpdb->query($wpdb->prepare(
                     "INSERT INTO $table_access (user_id, exam_type, category, subject, purchase_id, expires_at, created_at) 
-                     VALUES (%d, %s, %s, NULL, NULL, %s, NOW())",
+                     VALUES (%d, %s, %s, %s, 0, %s, NOW())",
                     $user_id,
                     $exam_type,
                     $cat,
+                    '',
                     $expires_at
                 ));
             }
@@ -633,6 +635,13 @@ class ZonaTech_Admin {
                 // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
                 $wpdb->query("ALTER TABLE `$table_access` ADD KEY `exam_category` (`exam_type`, `category`)");
             }
+            
+            // Ensure subject column allows NULL (older installs may have NOT NULL)
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $wpdb->query("ALTER TABLE `$table_access` MODIFY COLUMN `subject` varchar(100) DEFAULT NULL");
+            // Ensure purchase_id column allows NULL
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $wpdb->query("ALTER TABLE `$table_access` MODIFY COLUMN `purchase_id` bigint(20) DEFAULT NULL");
         }
     }
 }

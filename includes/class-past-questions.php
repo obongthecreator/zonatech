@@ -777,5 +777,12 @@ class ZonaTech_Past_Questions {
             // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
             $wpdb->query("ALTER TABLE `$table_access` ADD KEY `exam_category` (`exam_type`, `category`)");
         }
+        
+        // Ensure subject column allows NULL (older installs may have NOT NULL)
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $wpdb->query("ALTER TABLE `$table_access` MODIFY COLUMN `subject` varchar(100) DEFAULT NULL");
+        // Ensure purchase_id column allows NULL
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $wpdb->query("ALTER TABLE `$table_access` MODIFY COLUMN `purchase_id` bigint(20) DEFAULT NULL");
     }
 }
