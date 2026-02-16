@@ -4,6 +4,11 @@ if (!defined('ABSPATH')) exit;
 global $wpdb;
 $table_access = $wpdb->prefix . 'zonatech_user_access';
 
+// Ensure the category column exists (older installs may not have it)
+if (class_exists('ZonaTech_Past_Questions')) {
+    ZonaTech_Past_Questions::ensure_category_column();
+}
+
 // Get all active access records with user info
 $active_records = $wpdb->get_results(
     "SELECT a.*, u.display_name, u.user_email 

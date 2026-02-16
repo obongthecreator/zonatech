@@ -414,27 +414,8 @@ class ZonaTech_Admin {
         global $wpdb;
         $table_access = $wpdb->prefix . 'zonatech_user_access';
         
-        // Ensure the table exists (create it if missing)
-        $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_access));
-        if ($table_exists !== $table_access) {
-            require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-            $charset_collate = $wpdb->get_charset_collate();
-            $sql = "CREATE TABLE $table_access (
-                id bigint(20) NOT NULL AUTO_INCREMENT,
-                user_id bigint(20) NOT NULL,
-                exam_type varchar(20) NOT NULL,
-                subject varchar(100) DEFAULT NULL,
-                category varchar(50) DEFAULT NULL,
-                purchase_id bigint(20) DEFAULT NULL,
-                expires_at datetime DEFAULT NULL,
-                created_at datetime DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (id),
-                KEY user_id (user_id),
-                KEY exam_subject (exam_type, subject),
-                KEY exam_category (exam_type, category)
-            ) $charset_collate;";
-            dbDelta($sql);
-        }
+        // Ensure the table exists and has the category column
+        self::ensure_access_table($wpdb, $table_access);
         
         $granted = array();
         $skipped = array();
@@ -612,5 +593,46 @@ class ZonaTech_Admin {
                 'email' => $user->user_email
             )
         ));
+    }
+    
+    /**
+     * Ensure the zonatech_user_access table exists and has the category column.
+     * Older installations may have the table without the category column.
+     */
+    private static function ensure_access_table($wpdb, $table_access) {
+        // Check if the table exists
+        $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_access));
+        
+        if ($table_exists !== $table_access) {
+            // Table doesn't exist — create it with full schema
+            $charset_collate = $wpdb->get_charset_collate();
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $wpdb->query("CREATE TABLE IF NOT EXISTS `$table_access` (
+                `id` bigint(20) NOT NULL AUTO_INCREMENT,
+                `user_id` bigint(20) NOT NULL,
+                `exam_type` varchar(20) NOT NULL,
+                `subject` varchar(100) DEFAULT NULL,
+                `category` varchar(50) DEFAULT NULL,
+                `purchase_id` bigint(20) DEFAULT NULL,
+                `expires_at` datetime DEFAULT NULL,
+                `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                KEY `user_id` (`user_id`),
+                KEY `exam_subject` (`exam_type`, `subject`),
+                KEY `exam_category` (`exam_type`, `category`)
+            ) $charset_collate;");
+        } else {
+            // Table exists — check if category column exists
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $column_exists = $wpdb->get_results("SHOW COLUMNS FROM `$table_access` LIKE 'category'");
+            if (empty($column_exists)) {
+                // Add the category column
+                // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+                $wpdb->query("ALTER TABLE `$table_access` ADD COLUMN `category` varchar(50) DEFAULT NULL AFTER `subject`");
+                // Add index for category
+                // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+                $wpdb->query("ALTER TABLE `$table_access` ADD KEY `exam_category` (`exam_type`, `category`)");
+            }
+        }
     }
 }

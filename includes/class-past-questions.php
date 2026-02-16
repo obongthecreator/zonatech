@@ -10,6 +10,7 @@ if (!defined('ABSPATH')) {
 class ZonaTech_Past_Questions {
     
     private static $instance = null;
+    private static $category_column_ensured = false;
     
     public static function get_instance() {
         if (null === self::$instance) {
@@ -235,6 +236,9 @@ class ZonaTech_Past_Questions {
             dbDelta($sql);
             return false;
         }
+        
+        // Ensure category column exists (older installs may not have it)
+        self::ensure_category_column();
         
         // Check for category-level access
         $access = $wpdb->get_var($wpdb->prepare(
@@ -674,6 +678,9 @@ class ZonaTech_Past_Questions {
         
         // If compulsory, check if user has ANY category access for this exam type
         if ($is_compulsory) {
+            // Ensure category column exists before querying it
+            self::ensure_category_column();
+            
             $any_category_access = $wpdb->get_var($wpdb->prepare(
                 "SELECT COUNT(*) FROM $table_access 
                  WHERE user_id = %d AND exam_type = %s AND category IS NOT NULL AND category != ''
@@ -739,5 +746,36 @@ class ZonaTech_Past_Questions {
              ORDER BY exam_type, category, subject",
             $user_id
         ));
+    }
+    
+    /**
+     * Ensure the category column exists in zonatech_user_access table.
+     * Older installations may have the table without this column.
+     * Uses a static flag to only check once per request.
+     */
+    public static function ensure_category_column() {
+        if (self::$category_column_ensured) {
+            return;
+        }
+        self::$category_column_ensured = true;
+        
+        global $wpdb;
+        $table_access = $wpdb->prefix . 'zonatech_user_access';
+        
+        // Check if table exists
+        $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_access));
+        if ($table_exists !== $table_access) {
+            return; // Table doesn't exist; will be created elsewhere
+        }
+        
+        // Check if category column exists
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $col_check = $wpdb->get_results("SHOW COLUMNS FROM `$table_access` LIKE 'category'");
+        if (empty($col_check)) {
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $wpdb->query("ALTER TABLE `$table_access` ADD COLUMN `category` varchar(50) DEFAULT NULL AFTER `subject`");
+            // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+            $wpdb->query("ALTER TABLE `$table_access` ADD KEY `exam_category` (`exam_type`, `category`)");
+        }
     }
 }
